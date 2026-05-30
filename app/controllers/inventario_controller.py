@@ -251,6 +251,16 @@ def api_crear_pedido():
         # 3. Hacemos enqueue: agregamos al final de la cola
         cola_pedidos.enqueue(pedido_nuevo)
 
+        # Reducimos el stock del producto según la cantidad pedida
+        ProductoModel.actualizar(
+            producto_id = int(datos["producto_id"]),
+            nombre      = pedido_nuevo["producto"],
+            descripcion = ProductoModel.obtener_por_id(int(datos["producto_id"]))["descripcion"],
+            precio      = ProductoModel.obtener_por_id(int(datos["producto_id"]))["precio"],
+            stock       = ProductoModel.obtener_por_id(int(datos["producto_id"]))["stock"] - int(datos["cantidad"]),
+            categoria   = ProductoModel.obtener_por_id(int(datos["producto_id"]))["categoria"]
+        )
+
         return jsonify({
             "ok":           True,
             "mensaje":      "Pedido agregado a la cola",
@@ -332,6 +342,19 @@ def api_crear_devolucion():
 
         # 3. Hacemos push: la nueva devolución queda en la CIMA de la pila
         pila_devoluciones.push(devolucion_nueva)
+        # Aumentamos el stock del producto al registrar la devolución
+        pedido_info = PedidoModel.obtener_por_id(int(datos["pedido_id"]))
+        if pedido_info:
+            producto = ProductoModel.obtener_por_id(pedido_info["producto_id"])
+            if producto:
+                ProductoModel.actualizar(
+                    producto_id = producto["id"],
+                    nombre      = producto["nombre"],
+                    descripcion = producto["descripcion"],
+                    precio      = producto["precio"],
+                    stock       = producto["stock"] + pedido_info["cantidad"],
+                    categoria   = producto["categoria"]
+                )
 
         return jsonify({
             "ok":            True,

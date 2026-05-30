@@ -116,6 +116,34 @@ class PedidoModel:
         conn.close()
 
     @staticmethod
+    def obtener_por_id(pedido_id):
+        """
+        Busca y retorna un único pedido por su ID.
+        Se usa para saber qué producto afectar al registrar una devolución.
+        """
+        conn = get_connection()
+        cursor = conn.cursor()
+
+        cursor.execute("""
+            SELECT p.id, p.producto_id, p.cantidad, p.estado
+            FROM pedidos p
+            WHERE p.id = ?
+        """, (pedido_id,))
+
+        fila = cursor.fetchone()
+        conn.close()
+
+        if fila is None:
+            return None
+
+        return {
+            "id":          fila[0],
+            "producto_id": fila[1],
+            "cantidad":    fila[2],
+            "estado":      fila[3]
+        }
+
+    @staticmethod
     def contar_pendientes():
         """
         Retorna cuántos pedidos están pendientes.

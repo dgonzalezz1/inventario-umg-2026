@@ -123,6 +123,16 @@ class ProductoModel:
         conn = get_connection()
         cursor = conn.cursor()
 
+        # Primero eliminamos las devoluciones de los pedidos de este producto
+        cursor.execute("""
+            DELETE FROM devoluciones 
+            WHERE pedido_id IN (SELECT id FROM pedidos WHERE producto_id = ?)
+        """, (producto_id,))
+
+            # Luego eliminamos los pedidos del producto
+        cursor.execute("DELETE FROM pedidos WHERE producto_id = ?", (producto_id,))
+
+            # Finalmente eliminamos el producto
         cursor.execute("DELETE FROM productos WHERE id = ?", (producto_id,))
 
         conn.commit()
