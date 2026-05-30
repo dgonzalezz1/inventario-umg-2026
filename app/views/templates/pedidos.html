@@ -1,0 +1,237 @@
+{% extends "base.html" %}
+{% block title %}Pedidos - Cola FIFO{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <div>
+        <h4 class="mb-0 fw-bold">
+            Pedidos
+            <span class="badge bg-primary estructura-badge ms-2">Cola FIFO</span>
+        </h4>
+        <small class="text-muted">El pedido más antiguo siempre se procesa primero</small>
+    </div>
+    <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#modalPedido">
+        <i class="bi bi-plus-lg me-1"></i> Nuevo Pedido
+    </button>
+</div>
+
+<div class="row g-3">
+    <!-- ── Panel izquierdo: Visualización de la Cola ── -->
+    <div class="col-md-5">
+        <div class="card border-0 shadow-sm h-100">
+            <div class="card-header bg-white border-bottom d-flex justify-content-between align-items-center">
+                <div>
+                    <i class="bi bi-list-ol text-primary me-2"></i>
+                    <strong>Cola de Pedidos</strong>
+                </div>
+                <span class="badge bg-primary">{{ tamanio_cola }} en cola</span>
+            </div>
+            <div class="card-body">
+
+                <!-- Etiqueta FRENTE de la cola -->
+                {% if cola %}
+                    <div class="text-center mb-2">
+                        <small class="text-muted fw-bold">⬆ FRENTE (sale primero)</small>
+                    </div>
+                {% endif %}
+
+                <!-- Visualización de los elementos de la cola -->
+                {% for pedido in cola %}
+                <div class="queue-item {% if loop.first %}first{% endif %}">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <div>
+                            <strong>Pedido #{{ pedido.id }}</strong>
+                            {% if loop.first %}
+                                <!-- El primer elemento está marcado como "próximo a salir" -->
+                                <span class="badge bg-success ms-1" style="font-size:0.65rem;">próximo</span>
+                            {% endif %}
+                            <br>
+                            <small class="text-muted">{{ pedido.producto }} · {{ pedido.cantidad }} uds</small>
+                        </div>
+                        <span class="text-muted" style="font-size:1.3rem;">{% if loop.first %}⬅{% else %}·{% endif %}</span>
+                    </div>
+                </div>
+                {% else %}
+                <!-- Cola vacía -->
+                <div class="text-center text-muted py-4">
+                    <i class="bi bi-inbox fs-2 d-block mb-2"></i>
+                    La cola está vacía.<br>
+                    <small>Agrega un pedido para comenzar.</small>
+                </div>
+                {% endfor %}
+
+                <!-- Etiqueta FINAL de la cola -->
+                {% if cola %}
+                <div class="text-center mt-2">
+                    <small class="text-muted fw-bold">⬇ FINAL (entra aquí)</small>
+                </div>
+                {% endif %}
+
+                <!-- Botón para procesar el siguiente pedido (dequeue) -->
+                <div class="mt-3">
+                    <button class="btn btn-success w-100" onclick="procesarPedido()"
+                            {% if not cola %}disabled{% endif %}>
+                        <i class="bi bi-play-fill me-1"></i>
+                        Procesar siguiente (dequeue)
+                    </button>
+                </div>
+
+                <!-- Mensaje de resultado de la operación -->
+                <div id="mensajePedido" class="alert mt-2 d-none"></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ── Panel derecho: Historial de pedidos ── -->
+    <div class="col-md-7">
+        <div class="card border-0 shadow-sm">
+            <div class="card-header bg-white border-bottom">
+                <i class="bi bi-clock-history me-2"></i>
+                <strong>Historial de Pedidos</strong>
+            </div>
+            <div class="card-body p-0">
+                <table class="table table-hover mb-0">
+                    <thead>
+                        <tr>
+                            <th>ID</th>
+                            <th>Producto</th>
+                            <th>Cantidad</th>
+                            <th>Estado</th>
+                            <th>Fecha</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for p in pedidos %}
+                        <tr>
+                            <td class="text-muted">#{{ p.id }}</td>
+                            <td>{{ p.producto }}</td>
+                            <td>{{ p.cantidad }}</td>
+                            <td>
+                                <span class="badge {% if p.estado == 'pendiente' %}bg-warning text-dark{% else %}bg-success{% endif %}">
+                                    {{ p.estado }}
+                                </span>
+                            </td>
+                            <td><small class="text-muted">{{ p.fecha[:16] }}</small></td>
+                        </tr>
+                        {% else %}
+                        <tr>
+                            <td colspan="5" class="text-center text-muted py-3">Sin pedidos registrados</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- ── Modal: Nuevo Pedido ── -->
+<div class="modal fade" id="modalPedido" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Nuevo Pedido</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <p class="text-muted small">
+                    <i class="bi bi-info-circle me-1"></i>
+                    El pedido se agregará al <strong>final de la cola</strong> (enqueue).
+                </p>
+                <div class="mb-3">
+                    <label class="form-label">Producto <span class="text-danger">*</span></label>
+                    <select class="form-select" id="selectProducto">
+                        <option value="">-- Selecciona un producto --</option>
+                        {% for p in productos %}
+                        <option value="{{ p.id }}">{{ p.nombre }} (Stock: {{ p.stock }})</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="mb-3">
+                    <label class="form-label">Cantidad <span class="text-danger">*</span></label>
+                    <input type="number" class="form-control" id="inputCantidad" min="1" value="1">
+                </div>
+                <div id="mensajeModalPedido" class="alert d-none"></div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                <button type="button" class="btn btn-primary" onclick="agregarPedido()">
+                    <i class="bi bi-cart-plus me-1"></i> Agregar a la cola
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+// ── JavaScript para la gestión de la Cola de Pedidos ──
+
+/**
+ * Llama a la API para agregar un nuevo pedido al FINAL de la cola.
+ * Operación: enqueue()
+ */
+async function agregarPedido() {
+    const productoId = document.getElementById("selectProducto").value;
+    const cantidad   = document.getElementById("inputCantidad").value;
+
+    if (!productoId) {
+        mostrarMsgModal("Selecciona un producto.", "danger");
+        return;
+    }
+
+    try {
+        const res = await fetch("/api/pedidos", {
+            method:  "POST",
+            headers: { "Content-Type": "application/json" },
+            body:    JSON.stringify({ producto_id: productoId, cantidad: cantidad })
+        });
+        const data = await res.json();
+
+        if (data.ok) {
+            location.reload();  // Recargamos para ver el nuevo estado de la cola
+        } else {
+            mostrarMsgModal(data.mensaje, "danger");
+        }
+    } catch (e) {
+        mostrarMsgModal("Error de conexión.", "danger");
+    }
+}
+
+/**
+ * Llama a la API para procesar el PRIMER pedido de la cola.
+ * Operación: dequeue()
+ */
+async function procesarPedido() {
+    try {
+        const res  = await fetch("/api/pedidos/procesar", { method: "POST" });
+        const data = await res.json();
+
+        if (data.ok) {
+            // Mostramos un mensaje breve antes de recargar
+            mostrarMsg(`✔ ${data.mensaje}`, "success");
+            setTimeout(() => location.reload(), 1200);
+        } else {
+            mostrarMsg(data.mensaje, "warning");
+        }
+    } catch (e) {
+        mostrarMsg("Error de conexión.", "danger");
+    }
+}
+
+function mostrarMsg(texto, tipo) {
+    const el = document.getElementById("mensajePedido");
+    el.className = `alert alert-${tipo}`;
+    el.textContent = texto;
+    el.classList.remove("d-none");
+}
+
+function mostrarMsgModal(texto, tipo) {
+    const el = document.getElementById("mensajeModalPedido");
+    el.className = `alert alert-${tipo}`;
+    el.textContent = texto;
+    el.classList.remove("d-none");
+}
+</script>
+{% endblock %}

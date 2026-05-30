@@ -1,0 +1,233 @@
+{% extends "base.html" %}
+{% block title %}Devoluciones - Pila LIFO{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <div>
+        <h4 class="mb-0 fw-bold">
+            Devoluciones
+            <span class="badge bg-danger estructura-badge ms-2">Pila LIFO</span>
+        </h4>
+        <small class="text-muted">La devolución más reciente siempre se revisa primero</small>
+    </div>
+    <button class="btn btn-danger" data-bs-toggle="modal" data-bs-target="#modalDevolucion">
+        <i class="bi bi-plus-lg me-1"></i> Registrar Devolución
+    </button>
+</div>
+
+<div class="row g-3">
+    <!-- ── Panel izquierdo: Visualización de la Pila ── -->
+    <div class="col-md-5">
+        <div class="card border-0 shadow-sm h-100">
+            <div class="card-header bg-white border-bottom d-flex justify-content-between align-items-center">
+                <div>
+                    <i class="bi bi-stack text-danger me-2"></i>
+                    <strong>Pila de Devoluciones</strong>
+                </div>
+                <span class="badge bg-danger">{{ tamanio_pila }} en pila</span>
+            </div>
+            <div class="card-body">
+
+                <!-- Etiqueta CIMA de la pila -->
+                {% if pila %}
+                <div class="text-center mb-2">
+                    <small class="text-muted fw-bold">⬆ CIMA (sale primero)</small>
+                </div>
+                {% endif %}
+
+                <!-- Visualización de los elementos de la pila -->
+                {% for dev in pila %}
+                <div class="stack-item {% if loop.first %}top{% endif %}">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <div>
+                            <strong>Devolución #{{ dev.id }}</strong>
+                            {% if loop.first %}
+                                <span class="badge bg-warning text-dark ms-1" style="font-size:0.65rem;">cima</span>
+                            {% endif %}
+                            <br>
+                            <small class="text-muted">Pedido #{{ dev.pedido_id }} · {{ dev.motivo }}</small>
+                        </div>
+                    </div>
+                </div>
+                {% else %}
+                <div class="text-center text-muted py-4">
+                    <i class="bi bi-inbox fs-2 d-block mb-2"></i>
+                    La pila está vacía.<br>
+                    <small>No hay devoluciones pendientes.</small>
+                </div>
+                {% endfor %}
+
+                <!-- Etiqueta BASE de la pila -->
+                {% if pila %}
+                <div class="text-center mt-2">
+                    <small class="text-muted fw-bold">⬇ BASE (entró primero)</small>
+                </div>
+                {% endif %}
+
+                <!-- Botón para revisar la devolución de la cima (pop) -->
+                <div class="mt-3">
+                    <button class="btn btn-warning w-100 text-dark" onclick="revisarDevolucion()"
+                            {% if not pila %}disabled{% endif %}>
+                        <i class="bi bi-check2 me-1"></i>
+                        Revisar cima (pop)
+                    </button>
+                </div>
+
+                <div id="mensajeDevolucion" class="alert mt-2 d-none"></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ── Panel derecho: Historial ── -->
+    <div class="col-md-7">
+        <div class="card border-0 shadow-sm">
+            <div class="card-header bg-white border-bottom">
+                <i class="bi bi-clock-history me-2"></i>
+                <strong>Historial de Devoluciones</strong>
+            </div>
+            <div class="card-body p-0">
+                <table class="table table-hover mb-0">
+                    <thead>
+                        <tr>
+                            <th>ID</th>
+                            <th>Pedido</th>
+                            <th>Motivo</th>
+                            <th>Estado</th>
+                            <th>Fecha</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for d in devoluciones %}
+                        <tr>
+                            <td class="text-muted">#{{ d.id }}</td>
+                            <td>#{{ d.pedido_id }}</td>
+                            <td><small>{{ d.motivo }}</small></td>
+                            <td>
+                                <span class="badge {% if d.estado == 'pendiente' %}bg-warning text-dark{% else %}bg-success{% endif %}">
+                                    {{ d.estado }}
+                                </span>
+                            </td>
+                            <td><small class="text-muted">{{ d.fecha[:16] }}</small></td>
+                        </tr>
+                        {% else %}
+                        <tr>
+                            <td colspan="5" class="text-center text-muted py-3">Sin devoluciones registradas</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- ── Modal: Registrar Devolución ── -->
+<div class="modal fade" id="modalDevolucion" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Registrar Devolución</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <p class="text-muted small">
+                    <i class="bi bi-info-circle me-1"></i>
+                    La devolución se colocará en la <strong>cima de la pila</strong> (push).
+                </p>
+                <div class="mb-3">
+                    <label class="form-label">Pedido relacionado <span class="text-danger">*</span></label>
+                    <select class="form-select" id="selectPedido">
+                        <option value="">-- Selecciona un pedido --</option>
+                        {% for p in pedidos %}
+                        <option value="{{ p.id }}">#{{ p.id }} - {{ p.producto }} ({{ p.estado }})</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="mb-3">
+                    <label class="form-label">Motivo <span class="text-danger">*</span></label>
+                    <input type="text" class="form-control" id="inputMotivo"
+                           placeholder="Ej: Producto dañado, talla incorrecta...">
+                </div>
+                <div id="mensajeModalDev" class="alert d-none"></div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                <button type="button" class="btn btn-danger" onclick="agregarDevolucion()">
+                    <i class="bi bi-arrow-return-left me-1"></i> Registrar en pila
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+// ── JavaScript para la gestión de la Pila de Devoluciones ──
+
+/**
+ * Llama a la API para agregar una devolución a la CIMA de la pila.
+ * Operación: push()
+ */
+async function agregarDevolucion() {
+    const pedidoId = document.getElementById("selectPedido").value;
+    const motivo   = document.getElementById("inputMotivo").value.trim();
+
+    if (!pedidoId || !motivo) {
+        mostrarMsgModal("Selecciona un pedido e ingresa el motivo.", "danger");
+        return;
+    }
+
+    try {
+        const res = await fetch("/api/devoluciones", {
+            method:  "POST",
+            headers: { "Content-Type": "application/json" },
+            body:    JSON.stringify({ pedido_id: pedidoId, motivo: motivo })
+        });
+        const data = await res.json();
+
+        if (data.ok) {
+            location.reload();
+        } else {
+            mostrarMsgModal(data.mensaje, "danger");
+        }
+    } catch (e) {
+        mostrarMsgModal("Error de conexión.", "danger");
+    }
+}
+
+/**
+ * Llama a la API para revisar la devolución de la CIMA de la pila.
+ * Operación: pop()
+ */
+async function revisarDevolucion() {
+    try {
+        const res  = await fetch("/api/devoluciones/revisar", { method: "POST" });
+        const data = await res.json();
+
+        if (data.ok) {
+            mostrarMsg(`✔ ${data.mensaje}`, "success");
+            setTimeout(() => location.reload(), 1200);
+        } else {
+            mostrarMsg(data.mensaje, "warning");
+        }
+    } catch (e) {
+        mostrarMsg("Error de conexión.", "danger");
+    }
+}
+
+function mostrarMsg(texto, tipo) {
+    const el = document.getElementById("mensajeDevolucion");
+    el.className = `alert alert-${tipo}`;
+    el.textContent = texto;
+    el.classList.remove("d-none");
+}
+
+function mostrarMsgModal(texto, tipo) {
+    const el = document.getElementById("mensajeModalDev");
+    el.className = `alert alert-${tipo}`;
+    el.textContent = texto;
+    el.classList.remove("d-none");
+}
+</script>
+{% endblock %}

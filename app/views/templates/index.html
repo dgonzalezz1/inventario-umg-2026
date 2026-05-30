@@ -1,0 +1,128 @@
+{% extends "base.html" %}
+{% block title %}Dashboard - Inventario{% endblock %}
+
+{% block content %}
+<!-- ── Encabezado de la página ── -->
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <div>
+        <h4 class="mb-0 fw-bold">Dashboard</h4>
+        <small class="text-muted">Resumen general del sistema de inventarios</small>
+    </div>
+</div>
+
+<!-- ── Tarjetas de resumen ── -->
+<div class="row g-3 mb-4">
+
+    <!-- Tarjeta: Total de productos -->
+    <div class="col-md-4">
+        <div class="card stat-card h-100">
+            <div class="card-body d-flex align-items-center gap-3">
+                <div class="p-3 rounded-3 bg-primary bg-opacity-10">
+                    <i class="bi bi-box-seam fs-2 text-primary"></i>
+                </div>
+                <div>
+                    <div class="fs-2 fw-bold">{{ resumen.total_productos }}</div>
+                    <div class="text-muted">Productos registrados</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Tarjeta: Pedidos pendientes (Cola) -->
+    <div class="col-md-4">
+        <div class="card stat-card h-100">
+            <div class="card-body d-flex align-items-center gap-3">
+                <div class="p-3 rounded-3 bg-warning bg-opacity-10">
+                    <i class="bi bi-cart3 fs-2 text-warning"></i>
+                </div>
+                <div>
+                    <div class="fs-2 fw-bold">{{ resumen.pedidos_pendientes }}</div>
+                    <div class="text-muted">
+                        Pedidos en cola
+                        <span class="badge bg-primary estructura-badge ms-1">FIFO</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Tarjeta: Devoluciones pendientes (Pila) -->
+    <div class="col-md-4">
+        <div class="card stat-card h-100">
+            <div class="card-body d-flex align-items-center gap-3">
+                <div class="p-3 rounded-3 bg-danger bg-opacity-10">
+                    <i class="bi bi-arrow-return-left fs-2 text-danger"></i>
+                </div>
+                <div>
+                    <div class="fs-2 fw-bold">{{ resumen.devoluciones }}</div>
+                    <div class="text-muted">
+                        Devoluciones en pila
+                        <span class="badge bg-danger estructura-badge ms-1">LIFO</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- ── Siguiente pedido a procesar ── -->
+<div class="row g-3">
+    <div class="col-md-6">
+        <div class="card border-0 shadow-sm h-100">
+            <div class="card-header bg-white border-bottom">
+                <i class="bi bi-cart3 text-primary me-2"></i>
+                <strong>Próximo pedido en la Cola</strong>
+                <span class="badge bg-primary estructura-badge ms-2">peek()</span>
+            </div>
+            <div class="card-body">
+                {% if resumen.proximo_pedido %}
+                    <p class="mb-1">
+                        <strong>Producto:</strong> {{ resumen.proximo_pedido.producto }}
+                    </p>
+                    <p class="mb-1">
+                        <strong>Cantidad:</strong> {{ resumen.proximo_pedido.cantidad }}
+                    </p>
+                    <p class="mb-0">
+                        <strong>Estado:</strong>
+                        <span class="badge bg-warning text-dark">
+                            {{ resumen.proximo_pedido.estado }}
+                        </span>
+                    </p>
+                {% else %}
+                    <p class="text-muted mb-0">
+                        <i class="bi bi-check-circle text-success me-1"></i>
+                        No hay pedidos pendientes en la cola.
+                    </p>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+
+    <!-- Explicación de las estructuras -->
+    <div class="col-md-6">
+        <div class="card border-0 shadow-sm h-100">
+            <div class="card-header bg-white border-bottom">
+                <i class="bi bi-info-circle text-info me-2"></i>
+                <strong>Estructuras de datos en uso</strong>
+            </div>
+            <div class="card-body">
+                <div class="mb-3">
+                    <span class="badge bg-primary mb-1">Cola (Queue) - FIFO</span>
+                    <p class="small text-muted mb-0">
+                        Los pedidos entran por el final y salen por el frente.
+                        El pedido más antiguo siempre se procesa primero.
+                    </p>
+                </div>
+                <hr>
+                <div>
+                    <span class="badge bg-danger mb-1">Pila (Stack) - LIFO</span>
+                    <p class="small text-muted mb-0">
+                        Las devoluciones se apilan una sobre otra.
+                        La más reciente siempre se revisa primero.
+                    </p>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

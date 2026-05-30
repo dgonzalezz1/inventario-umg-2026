@@ -1,0 +1,247 @@
+{% extends "base.html" %}
+{% block title %}Productos - Inventario{% endblock %}
+
+{% block content %}
+<!-- ── Encabezado ── -->
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <div>
+        <h4 class="mb-0 fw-bold">Productos</h4>
+        <small class="text-muted">Consulta y administra el catálogo de productos</small>
+    </div>
+    <!-- Botón que abre el modal para agregar producto -->
+    <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#modalProducto">
+        <i class="bi bi-plus-lg me-1"></i> Nuevo Producto
+    </button>
+</div>
+
+<!-- ── Tabla de productos ── -->
+<div class="card border-0 shadow-sm">
+    <div class="card-body p-0">
+        <table class="table table-hover mb-0">
+            <thead>
+                <tr>
+                    <th>ID</th>
+                    <th>Nombre</th>
+                    <th>Categoría</th>
+                    <th>Precio</th>
+                    <th>Stock</th>
+                    <th>Acciones</th>
+                </tr>
+            </thead>
+            <tbody id="tablaProductos">
+                <!-- Los productos se renderizan desde el servidor con Jinja2 -->
+                {% for p in productos %}
+                <tr>
+                    <td class="text-muted">#{{ p.id }}</td>
+                    <td>
+                        <strong>{{ p.nombre }}</strong>
+                        {% if p.descripcion %}
+                            <br><small class="text-muted">{{ p.descripcion }}</small>
+                        {% endif %}
+                    </td>
+                    <td>
+                        <span class="badge bg-secondary">{{ p.categoria }}</span>
+                    </td>
+                    <td>Q{{ "%.2f"|format(p.precio) }}</td>
+                    <td>
+                        <!-- Color rojo si el stock es bajo -->
+                        <span class="badge {% if p.stock < 5 %}bg-danger{% elif p.stock < 15 %}bg-warning text-dark{% else %}bg-success{% endif %}">
+                            {{ p.stock }} uds
+                        </span>
+                    </td>
+                    <td>
+                        <!-- Botón editar: carga los datos del producto en el modal -->
+                        <button class="btn btn-sm btn-outline-primary me-1"
+                                onclick="editarProducto({{ p.id }}, '{{ p.nombre }}', '{{ p.descripcion }}', {{ p.precio }}, {{ p.stock }}, '{{ p.categoria }}')">
+                            <i class="bi bi-pencil"></i>
+                        </button>
+                        <!-- Botón eliminar: pide confirmación antes de borrar -->
+                        <button class="btn btn-sm btn-outline-danger"
+                                onclick="eliminarProducto({{ p.id }}, '{{ p.nombre }}')">
+                            <i class="bi bi-trash"></i>
+                        </button>
+                    </td>
+                </tr>
+                {% else %}
+                <!-- Mensaje cuando no hay productos en la BD -->
+                <tr>
+                    <td colspan="6" class="text-center text-muted py-4">
+                        No hay productos registrados. ¡Agrega el primero!
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<!-- ── Modal: Agregar / Editar Producto ── -->
+<!-- Un mismo modal sirve para crear y editar (el JS cambia el modo) -->
+<div class="modal fade" id="modalProducto" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="modalTitulo">Nuevo Producto</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <!-- ID oculto: se llena cuando editamos, vacío cuando creamos -->
+                <input type="hidden" id="productoId">
+
+                <div class="mb-3">
+                    <label class="form-label">Nombre <span class="text-danger">*</span></label>
+                    <input type="text" class="form-control" id="inputNombre" placeholder="Ej: Laptop HP 15&quot;">
+                </div>
+                <div class="mb-3">
+                    <label class="form-label">Descripción</label>
+                    <input type="text" class="form-control" id="inputDescripcion" placeholder="Descripción breve">
+                </div>
+                <div class="row g-2">
+                    <div class="col">
+                        <label class="form-label">Precio (Q) <span class="text-danger">*</span></label>
+                        <input type="number" class="form-control" id="inputPrecio" step="0.01" min="0" placeholder="0.00">
+                    </div>
+                    <div class="col">
+                        <label class="form-label">Stock</label>
+                        <input type="number" class="form-control" id="inputStock" min="0" placeholder="0">
+                    </div>
+                </div>
+                <div class="mb-3 mt-2">
+                    <label class="form-label">Categoría</label>
+                    <select class="form-select" id="inputCategoria">
+                        <option value="General">General</option>
+                        <option value="Computadoras">Computadoras</option>
+                        <option value="Accesorios">Accesorios</option>
+                        <option value="Monitores">Monitores</option>
+                        <option value="Audio">Audio</option>
+                        <option value="Almacenamiento">Almacenamiento</option>
+                    </select>
+                </div>
+                <!-- Mensaje de error/éxito dentro del modal -->
+                <div id="mensajeModal" class="alert d-none"></div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                <button type="button" class="btn btn-primary" onclick="guardarProducto()">
+                    <i class="bi bi-floppy me-1"></i> Guardar
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+{% endblock %}
+
+{% block extra_js %}
+<script>
+// ============================================================
+// JavaScript para el CRUD de productos
+// Usa fetch() para llamar a la API REST sin recargar la página
+// ============================================================
+
+/**
+ * Abre el modal en modo EDICIÓN con los datos del producto seleccionado.
+ * Se llama al hacer clic en el botón de lápiz de cada fila.
+ */
+function editarProducto(id, nombre, descripcion, precio, stock, categoria) {
+    // Cambiamos el título del modal
+    document.getElementById("modalTitulo").textContent = "Editar Producto";
+    // Llenamos el formulario con los datos actuales
+    document.getElementById("productoId").value    = id;
+    document.getElementById("inputNombre").value   = nombre;
+    document.getElementById("inputDescripcion").value = descripcion;
+    document.getElementById("inputPrecio").value   = precio;
+    document.getElementById("inputStock").value    = stock;
+    document.getElementById("inputCategoria").value = categoria;
+    // Abrimos el modal
+    new bootstrap.Modal(document.getElementById("modalProducto")).show();
+}
+
+/**
+ * Guarda el producto: crea uno nuevo (POST) o actualiza uno existente (PUT).
+ * Detecta el modo según si hay un ID en el campo oculto.
+ */
+async function guardarProducto() {
+    const id          = document.getElementById("productoId").value;
+    const nombre      = document.getElementById("inputNombre").value.trim();
+    const descripcion = document.getElementById("inputDescripcion").value.trim();
+    const precio      = document.getElementById("inputPrecio").value;
+    const stock       = document.getElementById("inputStock").value;
+    const categoria   = document.getElementById("inputCategoria").value;
+
+    // Validación básica en el cliente antes de enviar
+    if (!nombre || !precio) {
+        mostrarMensaje("El nombre y el precio son obligatorios.", "danger");
+        return;
+    }
+
+    const datos = { nombre, descripcion, precio, stock, categoria };
+
+    // Si hay ID → PUT (editar). Si no hay → POST (crear)
+    const url    = id ? `/api/productos/${id}` : "/api/productos";
+    const metodo = id ? "PUT" : "POST";
+
+    try {
+        const respuesta = await fetch(url, {
+            method:  metodo,
+            headers: { "Content-Type": "application/json" },
+            body:    JSON.stringify(datos)
+        });
+        const resultado = await respuesta.json();
+
+        if (resultado.ok) {
+            // Recargamos la página para ver los cambios en la tabla
+            location.reload();
+        } else {
+            mostrarMensaje(resultado.mensaje, "danger");
+        }
+    } catch (error) {
+        mostrarMensaje("Error de conexión con el servidor.", "danger");
+    }
+}
+
+/**
+ * Elimina un producto después de pedir confirmación al usuario.
+ */
+async function eliminarProducto(id, nombre) {
+    if (!confirm(`¿Estás seguro de eliminar "${nombre}"?`)) return;
+
+    try {
+        const respuesta = await fetch(`/api/productos/${id}`, { method: "DELETE" });
+        const resultado = await respuesta.json();
+
+        if (resultado.ok) {
+            location.reload();
+        } else {
+            alert("Error: " + resultado.mensaje);
+        }
+    } catch (error) {
+        alert("Error de conexión con el servidor.");
+    }
+}
+
+/**
+ * Muestra un mensaje de alerta dentro del modal.
+ * tipo puede ser "success", "danger", "warning", etc.
+ */
+function mostrarMensaje(texto, tipo) {
+    const el = document.getElementById("mensajeModal");
+    el.className = `alert alert-${tipo}`;
+    el.textContent = texto;
+    el.classList.remove("d-none");
+}
+
+// Limpiamos el modal cada vez que se abre desde cero (para "Nuevo Producto")
+document.getElementById("modalProducto").addEventListener("show.bs.modal", function(e) {
+    // Solo limpiamos si el botón que lo abrió NO es el de editar
+    if (!e.relatedTarget) return;  // vino de JS (editarProducto), no limpiar
+    document.getElementById("productoId").value    = "";
+    document.getElementById("inputNombre").value   = "";
+    document.getElementById("inputDescripcion").value = "";
+    document.getElementById("inputPrecio").value   = "";
+    document.getElementById("inputStock").value    = "";
+    document.getElementById("modalTitulo").textContent = "Nuevo Producto";
+    document.getElementById("mensajeModal").classList.add("d-none");
+});
+</script>
+{% endblock %}
